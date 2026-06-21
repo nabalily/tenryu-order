@@ -479,6 +479,21 @@
     <div id="history-list"></div>
   </div>
 
+  <!-- SETTINGS SCREEN -->
+  <div class="screen" id="screen-settings">
+    <div class="section-title">設定</div>
+    <div style="padding:0 14px;">
+      <div style="background:white;border-radius:12px;padding:16px;margin-bottom:12px;">
+        <div style="font-size:14px;font-weight:bold;margin-bottom:12px;">スタッフ名の管理</div>
+        <div id="staff-list-settings"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input type="text" class="form-input" id="new-staff-input" placeholder="新しいスタッフ名" style="flex:1;">
+          <button onclick="addStaffName()" style="padding:12px 16px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:14px;font-weight:bold;cursor:pointer;white-space:nowrap;">追加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- BOTTOM NAV -->
   <div class="bottom-nav">
     <button id="nav-tables" class="active" onclick="navTo('tables')">
@@ -502,6 +517,13 @@
         <path d="M12 7v5l3 3"/>
       </svg>
       注文履歴
+    </button>
+    <button id="nav-settings" onclick="navTo('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+      </svg>
+      設定
     </button>
   </div>
 </div>
@@ -609,7 +631,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, push, remove, get }
+import { getDatabase, ref, set, onValue, push, remove, get, update }
   from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js';
 
 // ================================================================
@@ -911,10 +933,11 @@ window.doLogout = function() {
 window.navTo = function(tab) {
   document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.remove('active'));
   document.getElementById(`nav-${tab}`).classList.add('active');
-  ['tables','order','cart','kitchen','history'].forEach(s =>
+  ['tables','order','cart','kitchen','history','settings'].forEach(s =>
     document.getElementById(`screen-${s}`).classList.remove('active'));
   document.getElementById(`screen-${tab}`).classList.add('active');
-  const titles = { tables:'テーブル選択', kitchen:'キッチン', history:'注文履歴' };
+  if (tab === 'settings') renderSettingsScreen();
+  const titles = { tables:'テーブル選択', kitchen:'キッチン', history:'注文履歴', settings:'設定' };
   document.getElementById('header-title').textContent = titles[tab] || '';
 };
 
@@ -970,6 +993,7 @@ function launchApp() {
   listenTableStatuses();
   listenKitchenOrders();
   listenHistory();
+  listenStaffSettings();
 }
 
 // ================================================================
@@ -1512,6 +1536,67 @@ function renderHistory(all) {
       </div>
     `;
     cont.appendChild(card);
+  });
+}
+
+// ================================================================
+// SETTINGS（スタッフ管理）
+// ================================================================
+let staffList = [...APP_CONFIG.staff];
+
+function listenStaffSettings() {
+  onValue(ref(db, 'settings/staff'), snap => {
+    if (snap.val()) {
+      staffList = snap.val();
+      refreshLoginStaffSelect();
+    }
+  });
+}
+
+function refreshLoginStaffSelect() {
+  const sel = document.getElementById('login-staff');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">選択してください</option>';
+  staffList.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+function renderSettingsScreen() {
+  const cont = document.getElementById('staff-list-settings');
+  cont.innerHTML = '';
+  staffList.forEach((name, idx) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;';
+    row.innerHTML = `
+      <span style="font-size:15px;">${name}</span>
+      <button data-idx="${idx}" style="background:none;border:none;color:#e53935;font-size:13px;cursor:pointer;padding:4px 8px;">削除</button>
+    `;
+    row.querySelector('button').onclick = () => removeStaffName(idx);
+    cont.appendChild(row);
+  });
+}
+
+window.addStaffName = async function() {
+  const input = document.getElementById('new-staff-input');
+  const name = input.value.trim();
+  if (!name) { showToast('名前を入力してください'); return; }
+  if (staffList.includes(name)) { showToast('すでに登録されています'); return; }
+  staffList = [...staffList, name];
+  await set(ref(db, 'settings/staff'), staffList);
+  input.value = '';
+  showToast(`${name} を追加しました`);
+};
+
+async function removeStaffName(idx) {
+  const name = staffList[idx];
+  showConfirm('スタッフ削除', `「${name}」を削除しますか？`, async () => {
+    staffList = staffList.filter((_, i) => i !== idx);
+    await set(ref(db, 'settings/staff'), staffList);
+    showToast(`${name} を削除しました`);
   });
 }
 
