@@ -1445,18 +1445,20 @@ function renderKitchen(all) {
     const card = document.createElement('div');
     card.className = 'order-card';
 
-    const itemsHtml = order.items.map((it, idx) => `
-      <div class="order-item-line" style="align-items:center;gap:8px;">
-        <span style="flex:1;">
-          <span class="item-qty">${it.qty}×</span>${it.name}
-          <span class="order-item-opt">${it.options ? '（'+it.options+'）' : ''}</span>
-        </span>
-        <button class="btn-serve-item" data-order-id="${id}" data-item-idx="${idx}"
-          style="padding:6px 14px;background:#2d7a2d;color:white;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap;flex-shrink:0;">
-          提供
-        </button>
-      </div>
-    `).join('');
+    const itemsHtml = order.items.flatMap((it, idx) =>
+      Array.from({ length: it.qty }, () => `
+        <div class="order-item-line" style="align-items:center;gap:8px;">
+          <span style="flex:1;">
+            ${it.name}
+            <span class="order-item-opt">${it.options ? '（'+it.options+'）' : ''}</span>
+          </span>
+          <button class="btn-serve-item" data-order-id="${id}" data-item-idx="${idx}"
+            style="padding:6px 14px;background:#2d7a2d;color:white;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+            提供
+          </button>
+        </div>
+      `)
+    ).join('');
 
     card.innerHTML = `
       <div class="order-card-head">
@@ -1480,8 +1482,11 @@ function renderKitchen(all) {
 
 async function serveItem(orderId, order, itemIdx) {
   const item = order.items[itemIdx];
-  const newItems = order.items.filter((_, i) => i !== itemIdx);
-  const newTotal = order.totalAmount - item.subtotal;
+  const newItems = order.items.map((it, i) => {
+    if (i !== itemIdx) return it;
+    return { ...it, qty: it.qty - 1, subtotal: it.unitPrice * (it.qty - 1) };
+  }).filter(it => it.qty > 0);
+  const newTotal = order.totalAmount - item.unitPrice;
 
   try {
     if (newItems.length === 0) {
