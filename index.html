@@ -417,7 +417,7 @@
   <!-- GLOBAL HEADER -->
   <div class="global-header">
     <h1 id="header-title">テーブル選択</h1>
-    <span class="staff-badge" id="header-staff"></span>
+    <span class="staff-badge" id="header-staff" onclick="doLogout()" style="cursor:pointer;" title="タップでログアウト"></span>
   </div>
 
   <!-- TABLES SCREEN -->
@@ -900,6 +900,13 @@ function showConfirm(title, msg, onOk) {
     document.getElementById('confirm-box').classList.remove('open');
   };
 }
+
+window.doLogout = function() {
+  showConfirm('ログアウト', `${currentStaff} でログアウトしますか？`, () => {
+    localStorage.removeItem('tenryu_sess');
+    location.reload();
+  });
+};
 
 window.navTo = function(tab) {
   document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.remove('active'));
